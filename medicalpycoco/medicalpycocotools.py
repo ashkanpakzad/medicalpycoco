@@ -1,65 +1,70 @@
 #!/usr/bin/env python3
-
 import os
 import re
-import datetime
 import numpy as np
-from itertools import groupby
-from skimage import measure
 from PIL import Image
-from pycocotools import mask
+import fnmatch
+from pathlib import Path
+from .cocoobjects import COCOimage, COCOann
 
 convert = lambda text: int(text) if text.isdigit() else text.lower()
 natrual_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ]
 
-def resize_binary_mask(array, new_size):
-    image = Image.fromarray(array.astype(np.uint8)*255)
-    image = image.resize(new_size)
-    return np.asarray(image).astype(np.bool_)
 
-def close_contour(contour):
-    if not np.array_equal(contour[0], contour[-1]):
-        contour = np.vstack((contour, contour[0]))
-    return contour
+# filter images methods
 
-def binary_mask_to_rle(binary_mask):
-    '''Converts binary mask to 'counts' method'''
-    rle = {'counts': [], 'size': list(binary_mask.shape)}
-    counts = rle.get('counts')
-    for i, (value, elements) in enumerate(groupby(binary_mask.ravel(order='F'))):
-        if i == 0 and value == 1:
-                counts.append(0)
-        counts.append(len(list(elements)))
-    if np.sum(binary_mask) < 1:
-        return None
+def filter_for_img(root, files, file_types=None):
+    if file_types is None:
+        file_types = ['*.jpeg', '*.jpg']
+    file_types = r'|'.join([fnmatch.translate(x) for x in file_types])
+    files = [os.path.join(root, f) for f in files]
+    files = [f for f in files if re.match(file_types, f)]
+    return files
 
-    return rle
 
-def binary_mask_to_polygon(binary_mask, tolerance=0):
-    """Converts a binary mask to COCO polygon representation
+def filter_for_annotations(root, files, image_filename, file_types=None):
+    if file_types is None:
+        file_types = ['*.png']
+    file_types = r'|'.join([fnmatch.translate(x) for x in file_types])
+    basename_no_extension = os.path.splitext(os.path.basename(image_filename))[0]
+    file_name_prefix = basename_no_extension + '.*'
+    files = [os.path.join(root, f) for f in files]
+    files = [f for f in files if re.match(file_types, f)]
+    files = [f for f in files if re.match(file_name_prefix, os.path.splitext(os.path.basename(f))[0])]
+    return files
 
-    Args:
-        binary_mask: a 2D binary numpy array where '1's represent the object
-        tolerance: Maximum distance from original points of polygon to approximated
-            polygonal chain. If tolerance is 0, the original coordinate array is returned.
+def convert2coco(coco_header, IMAGE_DIR, ANNOTATION_DIR, img_file_types=None, ann_file_types=None ):
+    coco_output = coco_header.copy()
+    CATEGORIES = coco_header["categories"]
+    segmentation_id = 1
 
-    Notes:
-        Largely redundant in medicalpycoco as masks are saved in the rle format.
-    """
-    polygons = []
-    # pad mask to close contours of shapes which start and end at an edge
-    padded_binary_mask = np.pad(binary_mask, pad_width=1, mode='constant', constant_values=0)
-    contours = measure.find_contours(padded_binary_mask, 0.5)
-    contours = np.subtract(contours, 1)
-    for contour in contours:
-        contour = close_contour(contour)
-        contour = measure.approximate_polygon(contour, tolerance)
-        if len(contour) < 3:
-            continue
-        contour = np.flip(contour, axis=1)
-        segmentation = contour.ravel().tolist()
-        # after padding and subtracting 1 we may get -0.5 points in our segmentation 
-        segmentation = [0 if i < 0 else i for i in segmentation]
-        polygons.append(segmentation)
+    # filter for jpeg images
+    for root, _, files in os.walk(IMAGE_DIR):
+        image_files = filter_for_img(root, files, file_types=img_file_types)
 
-    return polygons
+        # go through each image
+        for image_filename in image_files:
+            image_id = int(Path(image_filename).stem)
+            image_info = COCOimage(image_id, image_filename).todict()
+            coco_output["images"].append(image_info)
+
+            # filter for associated png annotations
+            for root, _, files in os.walk(ANNOTATION_DIR):
+                annotation_files = filter_for_annotations(root, files, image_filename, file_types=ann_file_types)
+
+                # go through each associated annotation
+                for annotation_filename in annotation_files:
+
+                    print(annotation_filename)
+                    class_id = [x['id'] for x in CATEGORIES if x['name'] in annotation_filename][0]
+
+                    category_info = {'id': class_id, 'is_crowd': 'crowd' in image_filename}
+
+                    annotation_info = COCOann(segmentation_id, image_id, category_info, annotation_filename,
+                                              image_size=[image_info['width'], image_info['height']]).todict()
+
+                    if annotation_info is not None:
+                        coco_output["annotations"].append(annotation_info)
+
+                    segmentation_id = segmentation_id + 1
+    return coco_output

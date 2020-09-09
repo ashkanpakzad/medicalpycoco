@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image
 from pathlib import Path
 from pycocotools import mask
-from .medicalpycocotools import binary_mask_to_rle, resize_binary_mask
+from itertools import groupby
 
 class COCOimage:
     def __init__(self, image_id, image_path,
@@ -62,3 +62,23 @@ class COCOann:
             return None
         else:
             return self.__dict__
+
+# mask methods
+
+def resize_binary_mask(array, new_size):
+    image = Image.fromarray(array.astype(np.uint8)*255)
+    image = image.resize(new_size)
+    return np.asarray(image).astype(np.bool_)
+
+def binary_mask_to_rle(binary_mask):
+    '''Converts binary mask to 'counts' method'''
+    rle = {'counts': [], 'size': list(binary_mask.shape)}
+    counts = rle.get('counts')
+    for i, (value, elements) in enumerate(groupby(binary_mask.ravel(order='F'))):
+        if i == 0 and value == 1:
+                counts.append(0)
+        counts.append(len(list(elements)))
+    if np.sum(binary_mask) < 1:
+        return None
+
+    return rle
