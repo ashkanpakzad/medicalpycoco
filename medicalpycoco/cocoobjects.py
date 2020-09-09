@@ -23,8 +23,13 @@ class COCOimage:
         return self.__dict__
 
 class COCOann:
-    def __init__(self, annotation_id, image_id, category_info, binary_mask, image_size=None, bounding_box=None):
+    def __init__(self, annotation_id, image_id, category_info, annotation_filename, image_size=None, bounding_box=None):
 
+        binary_mask = Image.open(annotation_filename)
+        if binary_mask.mode != '1' or binary_mask.mode != 'L':
+            binary_mask = binary_mask.convert('1')
+        binary_mask = np.array(binary_mask).astype(np.uint8)
+        # process binary mask
         if image_size is not None:
             binary_mask = resize_binary_mask(binary_mask, image_size)
 
@@ -52,7 +57,7 @@ class COCOann:
         self.height= binary_mask.shape[0]
 
     def todict(self):
-        if self.area < 1 or not self.segmentation:
+        if not self.segmentation:
             # no annotation
             return None
         else:

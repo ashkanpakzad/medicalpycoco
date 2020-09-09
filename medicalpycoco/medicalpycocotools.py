@@ -30,6 +30,8 @@ def binary_mask_to_rle(binary_mask):
         if i == 0 and value == 1:
                 counts.append(0)
         counts.append(len(list(elements)))
+    if np.sum(binary_mask) < 1:
+        return None
 
     return rle
 

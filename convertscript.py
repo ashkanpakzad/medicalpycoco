@@ -10,12 +10,12 @@ import numpy as np
 from pycococreatortools import pycococreatortools
 from pathlib import Path
 from pycocotools import mask
-from medicalpycoco.cocoobjects import COCOimage
+from medicalpycoco.cocoobjects import COCOimage, COCOann
 
-datasetname = 'dataset'  # savename
-ROOT_DIR = 'train'
-IMAGE_DIR = os.path.join(ROOT_DIR, "img")
-ANNOTATION_DIR = os.path.join(ROOT_DIR, "mask")
+datasetname = 'shapesdataset'  # savename
+ROOT_DIR = 'examples/shapes/train'
+IMAGE_DIR = os.path.join(ROOT_DIR, "shapes_train2018")
+ANNOTATION_DIR = os.path.join(ROOT_DIR, "annotations")
 
 INFO = {
     "description": "description",
@@ -36,12 +36,21 @@ LICENSES = [
 
 CATEGORIES = [
     {
-        'id': 0,
-        'name': 'laptop',
-        'supercategory': 'laptop',
+        'id': 1,
+        'name': 'square',
+        'supercategory': 'shape',
+    },
+    {
+        'id': 2,
+        'name': 'circle',
+        'supercategory': 'shape',
+    },
+    {
+        'id': 3,
+        'name': 'triangle',
+        'supercategory': 'shape',
     },
 ]
-
 
 def filter_for_jpeg(root, files):
     file_types = ['*.jpeg', '*.jpg']
@@ -96,9 +105,8 @@ def main():
                     class_id = [x['id'] for x in CATEGORIES if x['name'] in annotation_filename][0]
 
                     category_info = {'id': class_id, 'is_crowd': 'crowd' in image_filename}
-                    binary_mask = np.array(Image.open(annotation_filename)).astype(np.uint8)
 
-                    annotation_info = COCOann(segmentation_id, image_id, category_info, binary_mask,
+                    annotation_info = COCOann(segmentation_id, image_id, category_info, annotation_filename,
                                               image_size=[image_info['width'], image_info['height']]).todict()
 
                     if annotation_info is not None:
