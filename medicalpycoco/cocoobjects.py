@@ -26,8 +26,8 @@ class COCOann:
     def __init__(self, annotation_id, image_id, category_info, annotation_filename, image_size=None, bounding_box=None):
 
         binary_mask = Image.open(annotation_filename)
-        if binary_mask.mode != '1' or binary_mask.mode != 'L':
-            binary_mask = binary_mask.convert('1')
+#        if binary_mask.mode != '1' or binary_mask.mode != 'L':
+#            binary_mask = binary_mask.convert('1')
         binary_mask = np.array(binary_mask).astype(np.uint8)
         # process binary mask
         if image_size is not None:

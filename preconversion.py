@@ -3,7 +3,7 @@ import os
 from medicalpycoco.medicalconverttools import preprocess
 
 # set up paths
-ROOT_DIR = 'Task06_Lung/train'
+ROOT_DIR = 'Task06_Lung/val'
 IMAGE_VOL_DIR = os.path.join(ROOT_DIR, "volume")
 ANNOTATION_VOL_DIR = os.path.join(ROOT_DIR, "label")
 
