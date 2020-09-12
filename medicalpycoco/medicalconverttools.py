@@ -20,6 +20,9 @@ def getinstancemasks(binaryimage):
     return masks
 
 def preprocess(classes, src_IMAGE_VOL_DIR, src_ANNOTATION_VOL_DIR, newdir, roi=None, reorient=False):
+    '''classes must be dict with number keys for corresponding index in images. reorient flag will force images into RAS
+    orientation. roi, if set, crops images by index; roi must be a list of 3 elements by 2 specifying the lower and
+    upperbounds of each axis. To not specify a crop on a particular axis set to [0][-1].'''
     # TODO: implement roi mechanism to auto crop images, maybe allow mm units and voxels.
 # make new train and ann dir
     newdir = Path(newdir)
@@ -57,16 +60,24 @@ def preprocess(classes, src_IMAGE_VOL_DIR, src_ANNOTATION_VOL_DIR, newdir, roi=N
 
         # convert image slice by slice to TIFF
         vol = img.get_fdata()
+        if roi:
+            vol = vol[roi[0][0]:roi[0][1], roi[1][0]:roi[1][1], roi[2][0]:roi[2][1]]
         for i in range(vol.shape[-1]):
             slice = vol[..., i]
+            if roi:
+                slice = slice[roi[0][0]:roi[0][1], roi[1][0]:roi[1][1]]
             filesavename = str(imagename)+'_'+str(i)+'.tiff'
             tifffile.imwrite(imgdir.joinpath(filesavename), slice.astype(np.int16))
             print(filesavename)
 
         # convert slice by slice by instance by class to TIFF
         annvol = ann.get_fdata()
-        for i in range(ann.shape[-1]):
+        if roi:
+            annvol = annvol[roi[0][0]:roi[0][1], roi[1][0]:roi[1][1], roi[2][0]:roi[2][1]]
+        for i in range(annvol.shape[-1]):
             slice = annvol[..., i].astype(np.int)
+            if roi:
+                slice = slice[roi[0][0]:roi[0][1], roi[1][0]:roi[1][1]]
             # per class
             for j in range(1, np.max(slice)+1):
                 classslice = slice == j
@@ -76,7 +87,7 @@ def preprocess(classes, src_IMAGE_VOL_DIR, src_ANNOTATION_VOL_DIR, newdir, roi=N
                     instanceidx = 0
                     for mask in masks:
                         classname = classes[str(j)]
-                        filesavename = str(imagename)+'_'+str(i)+'_'+classname+'_'+str(instanceidx)+'.png'  # TODO what ann filename??
+                        filesavename = str(imagename)+'_'+str(i)+'_'+classname+'_'+str(instanceidx)+'.png'
                         ann_pil = Image.fromarray(mask.astype(np.uint8), mode='L')
                         ann_pil.save(anndir.joinpath(filesavename))
                         print(filesavename)
