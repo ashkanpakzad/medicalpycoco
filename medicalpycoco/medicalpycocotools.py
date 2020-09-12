@@ -37,6 +37,7 @@ def convert2coco(coco_header, IMAGE_DIR, ANNOTATION_DIR, img_file_types=None, an
     coco_output = coco_header.copy()
     CATEGORIES = coco_header["categories"]
     segmentation_id = 1
+    image_id = 1
 
     # filter for jpeg images
     for root, _, files in os.walk(IMAGE_DIR):
@@ -44,7 +45,6 @@ def convert2coco(coco_header, IMAGE_DIR, ANNOTATION_DIR, img_file_types=None, an
 
         # go through each image
         for image_filename in image_files:
-            image_id = int(Path(image_filename).stem)
             image_info = COCOimage(image_id, image_filename).todict()
             coco_output["images"].append(image_info)
 
@@ -67,4 +67,6 @@ def convert2coco(coco_header, IMAGE_DIR, ANNOTATION_DIR, img_file_types=None, an
                         coco_output["annotations"].append(annotation_info)
 
                     segmentation_id = segmentation_id + 1
+            image_id = image_id + 1
+
     return coco_output
