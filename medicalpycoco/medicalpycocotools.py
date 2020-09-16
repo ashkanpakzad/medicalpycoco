@@ -56,7 +56,7 @@ def convert2coco(coco_header, IMAGE_DIR, ANNOTATION_DIR, img_file_types=None, an
                 for annotation_filename in annotation_files:
 
                     print(annotation_filename)
-                    class_id = [x['id'] for x in CATEGORIES if x['name'] in annotation_filename][0]
+                    class_id = [x['id'] for x in CATEGORIES if '_'+x['name']+'_' in annotation_filename][0]
 
                     category_info = {'id': class_id, 'is_crowd': 'crowd' in image_filename}
 
