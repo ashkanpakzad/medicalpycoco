@@ -6,6 +6,8 @@ import tifffile
 import numpy as np
 from scipy import ndimage
 from pathlib import Path
+import random
+import shutil
 
 def getinstancemasks(binaryimage):
     masks = []
@@ -19,7 +21,7 @@ def getinstancemasks(binaryimage):
         masks.append(mask)
     return masks
 
-def preprocess(classes, src_IMAGE_VOL_DIR, src_ANNOTATION_VOL_DIR, newdir, roi=None, reorient=False):
+def preprocess(classes, src_IMAGE_VOL_DIR, src_ANNOTATION_VOL_DIR, newdir, roi=None, merge=False, reorient=False):
     '''classes must be dict with number keys for corresponding index in images. reorient flag will force images into RAS
     orientation. roi, if set, crops images by index; roi must be a list of 3 elements by 2 specifying the lower and
     upperbounds of each axis. To not specify a crop on a particular axis set to [0][-1].'''
@@ -82,7 +84,13 @@ def preprocess(classes, src_IMAGE_VOL_DIR, src_ANNOTATION_VOL_DIR, newdir, roi=N
             for j in range(1, np.max(slice)+1):
                 classslice = slice == j
                 # per instance
-                masks = getinstancemasks(classslice)
+                if merge == False:
+                    masks = getinstancemasks(classslice)
+                else:
+                    if classslice.any() == True:
+                        masks = [classslice]
+                    else:
+                        masks = False
                 if masks:
                     instanceidx = 0
                     for mask in masks:
@@ -93,3 +101,59 @@ def preprocess(classes, src_IMAGE_VOL_DIR, src_ANNOTATION_VOL_DIR, newdir, roi=N
                         print(filesavename)
                         instanceidx =+ 1
     return imgdir, anndir
+
+
+def datadivider(IMAGE_DIR, ANNOTATION_DIR, NEW_DIR, proportions, seed=None):
+    # list nifti volumes
+    filetypes = ['*.nii', '*.nii.gz']
+    for root, _, files in os.walk(IMAGE_DIR):
+        image_files = filter_for_img(root, files, file_types=filetypes)
+
+    # total number of data and split
+    total = float(len(image_files))
+    proportions = np.floor([total*i for i in proportions])
+    # add leftover if any to training set
+    if np.sum(proportions) != total:
+        proportions[0] = proportions[0] + total - np.sum(proportions)
+
+    # shuffle and split image file list
+    if seed is not None:
+        random.seed(seed)
+    random.shuffle(image_files)
+
+    proportions = proportions.astype(int)
+    filesplit = []
+    lower_idx = 0
+    upper_idx = 0
+    for num in proportions:
+        upper_idx = upper_idx + num
+        filesplit.append(image_files[lower_idx:upper_idx])
+        lower_idx = lower_idx + num
+
+
+    # make overall directories and img/label directories
+    f1 = ['train', 'val', 'test']
+    f2 = ['volume', 'label']
+
+    for i in range(0,3):
+        setname = Path(NEW_DIR).joinpath(f1[i])
+        setname.mkdir(parents=True, exist_ok=True)
+        voldir = setname.joinpath(f2[0])
+        lbldir = setname.joinpath(f2[1])
+        voldir.mkdir(parents=True, exist_ok=True)
+        lbldir.mkdir(parents=True, exist_ok=True)
+
+    # copy image to new directory
+        for imgname in filesplit[i]:
+            for root, _, files in os.walk(ANNOTATION_DIR):
+                annname = filter_for_annotations(root, files, imgname, file_types=filetypes)
+
+            imgname = Path(imgname)
+            annname = Path(annname[0])
+            shutil.copy(imgname, voldir.joinpath(imgname.name))
+            shutil.copy(annname, lbldir.joinpath(annname.name))
+            print(imgname)
+
+
+
+    # identify matching ann files
